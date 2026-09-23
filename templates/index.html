@@ -13,7 +13,7 @@
                 <span class="badge bg-info">RBAC + ABAC Engine</span>
             </div>
             <div class="card-body">
-                <h5>Evaluación de Políticas de Acceso</h5>
+                <h5>1. Evaluación de Políticas de Acceso</h5>
                 <hr>
                 <div class="row">
                     <div class="col-md-6">
@@ -32,21 +32,49 @@
                 <div class="row mt-3">
                     <div class="col-md-4">
                         <h6>Atributos Usuario</h6>
-                        <pre id="jsonUsuario" class="bg-dark text-warning p-2 rounded" style="height: 180px;"></pre>
+                        <pre id="jsonUsuario" class="bg-dark text-warning p-2 rounded" style="height: 180px; overflow-y: auto;"></pre>
                     </div>
                     <div class="col-md-4">
                         <h6>Atributos Documento</h6>
-                        <pre id="jsonDocumento" class="bg-dark text-info p-2 rounded" style="height: 180px;"></pre>
+                        <pre id="jsonDocumento" class="bg-dark text-info p-2 rounded" style="height: 180px; overflow-y: auto;"></pre>
                     </div>
                     <div class="col-md-4">
                         <h6>Atributos Entorno & Operación</h6>
-                        <pre id="jsonEntorno" class="bg-dark text-light p-2 rounded" style="height: 180px;"></pre>
+                        <pre id="jsonEntorno" class="bg-dark text-light p-2 rounded" style="height: 180px; overflow-y: auto;"></pre>
                     </div>
                 </div>
 
                 <div id="panelResultado" class="mt-4 d-none p-3 rounded">
                     <h4 id="resTitulo"></h4>
                     <p id="resMensaje" class="fs-5 m-0"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Módulo de Auditoría Requisito 14 -->
+        <div class="card shadow">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="m-0">📜 2. Registro de Auditoría y Trazabilidad (Audit Logs)</h5>
+                <button onclick="cargarAuditoria()" class="btn btn-sm btn-light">Actualizar Tabla</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Usuario</th>
+                                <th>Recurso</th>
+                                <th>Acción</th>
+                                <th>Fecha y Hora</th>
+                                <th>Resultado</th>
+                                <th>Motivo / Regla Falla</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaAuditoria">
+                            <tr><td colspan="7" class="text-center text-muted">Haz clic en "Actualizar Tabla" para cargar eventos.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -105,9 +133,41 @@
                 document.getElementById('resTitulo').innerText = `❌ ACCESO DENEGADO (Fallo en: ${data.etapa_fallo})`;
                 document.getElementById('resMensaje').innerText = data.mensaje;
             }
+
+            // Refrescar tabla de auditoría tras evaluar
+            cargarAuditoria();
         }
 
-        window.onload = cargarEscenario;
+        async function cargarAuditoria() {
+            const res = await fetch('/auditoria');
+            const logs = await res.json();
+
+            const tbody = document.getElementById('tablaAuditoria');
+            tbody.innerHTML = '';
+
+            logs.forEach(log => {
+                const badge = log.resultado === 'PERMITIDO' 
+                    ? '<span class="badge bg-success">PERMITIDO</span>' 
+                    : '<span class="badge bg-danger">DENEGADO</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${log.id}</td>
+                        <td><strong>${log.usuario}</strong></td>
+                        <td><code>${log.recurso}</code></td>
+                        <td><span class="badge bg-secondary">${log.accion}</span></td>
+                        <td><small>${log.fecha}</small></td>
+                        <td>${badge}</td>
+                        <td><small>${log.motivo}</small></td>
+                    </tr>
+                `;
+            });
+        }
+
+        window.onload = () => {
+            cargarEscenario();
+            cargarAuditoria();
+        };
     </script>
 </body>
 </html>
