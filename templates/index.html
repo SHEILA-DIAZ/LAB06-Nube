@@ -2,66 +2,112 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SecureDocs - Login</title>
+    <title>SecureDocs - RBAC + ABAC</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light p-4">
-    <div class="container" style="max-width: 500px;">
-        <div class="card shadow mt-4">
-            <div class="card-header bg-primary text-white text-center">
-                <h3>🔐 SecureDocs</h3>
-                <p class="m-0">Módulo de Autenticación (JWT)</p>
+    <div class="container">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h3 class="m-0">🔐 SecureDocs - Sistema de Gestión de Expedientes</h3>
+                <span class="badge bg-info">RBAC + ABAC Engine</span>
             </div>
             <div class="card-body">
-                <form id="loginForm">
-                    <div class="mb-3">
-                        <label class="form-label">Correo electrónico</label>
-                        <input type="email" id="correo" class="form-control" value="carlos.ruiz@techcorp.com" required>
+                <h5>Evaluación de Políticas de Acceso</h5>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Escenario de Prueba Preset:</label>
+                        <select id="selectEscenario" class="form-select mb-3" onchange="cargarEscenario()">
+                            <option value="1">Caso 1: Acceso Autorizado (Carlos Ruiz - Supervisor Finanzas)</option>
+                            <option value="2">Caso 2: Denegado por RBAC (Empleado intenta aprobar)</option>
+                            <option value="3">Caso 3: Denegado por ABAC (Nivel de seguridad insuficiente / Área distinta)</option>
+                        </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Contraseña</label>
-                        <input type="password" id="password" class="form-control" value="123456" required>
+                    <div class="col-md-6 d-flex align-items-end mb-3">
+                        <button onclick="evaluar()" class="btn btn-primary w-100 fw-bold">Ejecutar Evaluación de Acceso</button>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
-                </form>
+                </div>
 
-                <div id="resultado" class="mt-4 d-none">
-                    <div class="alert alert-success">
-                        <h5>¡Autenticación Exitosa!</h5>
-                        <p class="mb-1"><strong>Usuario:</strong> <span id="uNombre"></span></p>
-                        <p class="mb-1"><strong>Rol:</strong> <span id="uRol"></span></p>
-                        <p class="mb-1"><strong>Departamento:</strong> <span id="uDept"></span></p>
-                        <hr>
-                        <small class="text-break"><strong>JWT Token:</strong> <span id="uToken"></span></small>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <h6>Atributos Usuario</h6>
+                        <pre id="jsonUsuario" class="bg-dark text-warning p-2 rounded" style="height: 180px;"></pre>
                     </div>
+                    <div class="col-md-4">
+                        <h6>Atributos Documento</h6>
+                        <pre id="jsonDocumento" class="bg-dark text-info p-2 rounded" style="height: 180px;"></pre>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Atributos Entorno & Operación</h6>
+                        <pre id="jsonEntorno" class="bg-dark text-light p-2 rounded" style="height: 180px;"></pre>
+                    </div>
+                </div>
+
+                <div id="panelResultado" class="mt-4 d-none p-3 rounded">
+                    <h4 id="resTitulo"></h4>
+                    <p id="resMensaje" class="fs-5 m-0"></p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const correo = document.getElementById('correo').value;
-            const password = document.getElementById('password').value;
+        const escenarios = {
+            "1": {
+                usuario: {"id": 10, "nombre": "Carlos Ruiz", "correo": "carlos.ruiz@techcorp.com", "rol": "SUPERVISOR", "departamento": "FINANZAS", "nivel_seguridad": 3, "pais": "PERU", "tipo_contrato": "INTERNO", "estado": "ACTIVO"},
+                documento: {"id": 501, "titulo": "Presupuesto anual", "departamento": "FINANZAS", "nivel_confidencialidad": 3, "estado": "PENDIENTE", "pais": "PERU", "propietario": 10},
+                operacion: "APROBAR",
+                entorno: {"hora": "11:30", "pais": "PERU", "dispositivo": "CORPORATIVO"}
+            },
+            "2": {
+                usuario: {"id": 11, "nombre": "Lucia Mendez", "correo": "lucia.mendez@techcorp.com", "rol": "EMPLEADO", "departamento": "RRHH", "nivel_seguridad": 2, "pais": "PERU", "tipo_contrato": "INTERNO", "estado": "ACTIVO"},
+                documento: {"id": 501, "titulo": "Presupuesto anual", "departamento": "FINANZAS", "nivel_confidencialidad": 3, "estado": "PENDIENTE", "pais": "PERU", "propietario": 10},
+                operacion: "APROBAR",
+                entorno: {"hora": "11:30", "pais": "PERU", "dispositivo": "CORPORATIVO"}
+            },
+            "3": {
+                usuario: {"id": 11, "nombre": "Lucia Mendez", "correo": "lucia.mendez@techcorp.com", "rol": "EMPLEADO", "departamento": "RRHH", "nivel_seguridad": 2, "pais": "PERU", "tipo_contrato": "INTERNO", "estado": "ACTIVO"},
+                documento: {"id": 502, "titulo": "Presupuesto Corporativo", "departamento": "FINANZAS", "nivel_confidencialidad": 4, "estado": "PENDIENTE", "pais": "PERU", "propietario": 12},
+                operacion: "MODIFICAR",
+                entorno: {"hora": "11:30", "pais": "PERU", "dispositivo": "CORPORATIVO"}
+            }
+        };
 
-            const res = await fetch('/auth/login', {
+        function cargarEscenario() {
+            const val = document.getElementById('selectEscenario').value;
+            const esc = escenarios[val];
+            document.getElementById('jsonUsuario').innerText = JSON.stringify(esc.usuario, null, 2);
+            document.getElementById('jsonDocumento').innerText = JSON.stringify(esc.documento, null, 2);
+            document.getElementById('jsonEntorno').innerText = JSON.stringify({operacion: esc.operacion, ...esc.entorno}, null, 2);
+        }
+
+        async function evaluar() {
+            const val = document.getElementById('selectEscenario').value;
+            const esc = escenarios[val];
+
+            const res = await fetch('/documentos/evaluar', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ correo, password })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(esc)
             });
 
             const data = await res.json();
+            const panel = document.getElementById('panelResultado');
+            panel.classList.remove('d-none', 'alert-success', 'alert-danger');
+
             if (res.ok) {
-                document.getElementById('resultado').classList.remove('d-none');
-                document.getElementById('uNombre').innerText = data.usuario.nombre;
-                document.getElementById('uRol').innerText = data.usuario.rol;
-                document.getElementById('uDept').innerText = data.usuario.departamento;
-                document.getElementById('uToken').innerText = data.token;
+                panel.classList.add('alert', 'alert-success');
+                document.getElementById('resTitulo').innerText = '✅ ACCESO AUTORIZADO (RBAC = OK, ABAC = OK)';
+                document.getElementById('resMensaje').innerText = data.mensaje;
             } else {
-                alert(data.mensaje);
+                panel.classList.add('alert', 'alert-danger');
+                document.getElementById('resTitulo').innerText = `❌ ACCESO DENEGADO (Fallo en: ${data.etapa_fallo})`;
+                document.getElementById('resMensaje').innerText = data.mensaje;
             }
-        });
+        }
+
+        window.onload = cargarEscenario;
     </script>
 </body>
 </html>
